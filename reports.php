@@ -9,6 +9,7 @@ requirePersonnel();
 
 $message = '';
 $personnelId = $_SESSION['user_id'];
+$companyId = $_SESSION['company_id']; // دریافت شرکت فعال کاربر
 
 // Add new report
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_report'])) {
@@ -23,9 +24,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_report'])) {
             // Begin transaction
             $pdo->beginTransaction();
             
-            // Insert main report
-            $stmt = $pdo->prepare("INSERT INTO reports (personnel_id, report_date) VALUES (?, ?)");
-            $stmt->execute([$personnelId, $report_date]);
+            // Insert main report - اضافه کردن شرکت فعال
+            $stmt = $pdo->prepare("INSERT INTO reports (personnel_id, report_date, company_id) VALUES (?, ?, ?)");
+            $stmt->execute([$personnelId, $report_date, $companyId]);
             $reportId = $pdo->lastInsertId();
             
             // Insert report items and their categories
@@ -83,6 +84,15 @@ include 'header.php';
                 <label for="report_date" class="col-md-2 col-form-label">تاریخ گزارش</label>
                 <div class="col-md-10">
                     <input type="date" class="form-control" id="report_date" name="report_date" value="<?php echo date('Y-m-d'); ?>" required>
+                </div>
+            </div>
+            
+            <!-- نمایش شرکت فعال کاربر -->
+            <div class="row mb-3">
+                <label class="col-md-2 col-form-label">شرکت</label>
+                <div class="col-md-10">
+                    <input type="text" class="form-control" value="<?php echo $_SESSION['company_name']; ?>" disabled>
+                    <small class="form-text text-muted">گزارش برای شرکت فعال شما ثبت خواهد شد.</small>
                 </div>
             </div>
             

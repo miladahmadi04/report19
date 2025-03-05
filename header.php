@@ -195,7 +195,7 @@ require_once 'auth.php';
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                <?php if (!isAdmin() && isset($_SESSION['companies']) && count($_SESSION['companies']) > 1): ?>
+                <?php if (!isAdmin() && isset($_SESSION['companies'])): ?>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="companyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fas fa-building"></i> <?php echo $_SESSION['company_name']; ?>

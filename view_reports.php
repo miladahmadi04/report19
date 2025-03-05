@@ -10,6 +10,7 @@ if (!isLoggedIn()) {
 }
 
 $personnelId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+$currentCompanyId = $_SESSION['company_id']; // دریافت شرکت فعال
 
 // Filter parameters
 $startDate = isset($_GET['start_date']) ? clean($_GET['start_date']) : '';
@@ -43,13 +44,13 @@ if (isAdmin()) {
               (SELECT COUNT(*) FROM report_items WHERE report_id = r.id) as item_count
               FROM reports r
               JOIN personnel p ON r.personnel_id = p.id
-              JOIN companies c ON p.company_id = c.id
+              JOIN companies c ON r.company_id = c.id
               WHERE 1=1";
     $params = [];
     
     // Filter by company if selected
     if (!empty($companyFilter)) {
-        $query .= " AND c.id = ?";
+        $query .= " AND r.company_id = ?";
         $params[] = $companyFilter;
     }
     
@@ -64,9 +65,9 @@ if (isAdmin()) {
               (SELECT COUNT(*) FROM report_items WHERE report_id = r.id) as item_count
               FROM reports r
               JOIN personnel p ON r.personnel_id = p.id
-              JOIN companies c ON p.company_id = c.id
-              WHERE c.id = ?";
-    $params = [$_SESSION['company_id']];
+              JOIN companies c ON r.company_id = c.id
+              WHERE r.company_id = ?";
+    $params = [$currentCompanyId]; // استفاده از شرکت فعال
     
     // Filter by personnel if CEO selects a personnel
     if (!empty($personnelFilter)) {
@@ -74,14 +75,14 @@ if (isAdmin()) {
         $params[] = $personnelFilter;
     }
 } else {
-    // Regular personnel can only see their own reports
+    // Regular personnel can only see their own reports in the current company
     $query = "SELECT r.*, 
               (SELECT COUNT(*) FROM report_items WHERE report_id = r.id) as item_count,
               (SELECT username FROM personnel WHERE id = r.personnel_id) as personnel_name,
-              (SELECT c.name FROM personnel p JOIN companies c ON p.company_id = c.id WHERE p.id = r.personnel_id) as company_name
+              (SELECT name FROM companies WHERE id = r.company_id) as company_name
               FROM reports r 
-              WHERE r.personnel_id = ?";
-    $params = [$personnelId];
+              WHERE r.personnel_id = ? AND r.company_id = ?";
+    $params = [$personnelId, $currentCompanyId];
 }
 
 // Apply filters
@@ -163,7 +164,7 @@ include 'header.php';
                         <option value="">همه پرسنل</option>
                         <?php 
                             $stmt = $pdo->prepare("SELECT id, username FROM personnel WHERE company_id = ? ORDER BY username");
-                            $stmt->execute([$_SESSION['company_id']]);
+                            $stmt->execute([$currentCompanyId]); // استفاده از شرکت فعال
                             $companyPersonnel = $stmt->fetchAll();
                             
                             foreach ($companyPersonnel as $person): 
@@ -202,6 +203,12 @@ include 'header.php';
         </form>
     </div>
 </div>
+
+<?php if (!isAdmin() && !isCEO()): ?>
+<div class="alert alert-info">
+    <i class="fas fa-info-circle"></i> در حال نمایش گزارش‌های شرکت: <strong><?php echo $_SESSION['company_name']; ?></strong>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <div class="card-body">

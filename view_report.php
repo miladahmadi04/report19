@@ -20,12 +20,14 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 }
 
 $reportId = clean($_GET['id']);
+$currentCompanyId = $_SESSION['company_id']; // دریافت شرکت فعال
 
 // Get report details
-$stmt = $pdo->prepare("SELECT r.*, p.username as personnel_name, p.id as personnel_id, c.name as company_name 
+$stmt = $pdo->prepare("SELECT r.*, p.username as personnel_name, p.id as personnel_id, 
+                      c.name as company_name, c.id as company_id 
                       FROM reports r 
                       JOIN personnel p ON r.personnel_id = p.id 
-                      JOIN companies c ON p.company_id = c.id 
+                      JOIN companies c ON r.company_id = c.id 
                       WHERE r.id = ?");
 $stmt->execute([$reportId]);
 $report = $stmt->fetch();
@@ -41,7 +43,8 @@ if (!$report) {
 }
 
 // Check if user has permission to view this report
-if (!canAccessReports($report['personnel_id'], $pdo)) {
+if (!canAccessReport($report, $currentCompanyId)) {
+    $_SESSION['error_message'] = 'شما دسترسی لازم برای مشاهده این گزارش را ندارید.';
     if (isAdmin()) {
         redirect('admin_dashboard.php');
     } elseif (isCEO()) {
@@ -62,6 +65,22 @@ $stmt = $pdo->prepare("SELECT ri.*,
                       ORDER BY ri.created_at");
 $stmt->execute([$reportId]);
 $reportItems = $stmt->fetchAll();
+
+// تابع بررسی دسترسی به گزارش
+function canAccessReport($report, $currentCompanyId) {
+    // مدیر سیستم به همه گزارش‌ها دسترسی دارد
+    if (isAdmin()) {
+        return true;
+    }
+    
+    // مدیر عامل فقط به گزارش‌های شرکت خود دسترسی دارد
+    if (isCEO()) {
+        return $report['company_id'] == $currentCompanyId;
+    }
+    
+    // کاربر عادی فقط به گزارش‌های خود در شرکت فعلی دسترسی دارد
+    return $report['personnel_id'] == $_SESSION['user_id'] && $report['company_id'] == $currentCompanyId;
+}
 
 include 'header.php';
 ?>
@@ -86,11 +105,14 @@ include 'header.php';
     </div>
     <div class="card-body">
         <div class="row mb-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <p><strong>نام پرسنل:</strong> <?php echo $report['personnel_name']; ?></p>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <p><strong>شرکت:</strong> <?php echo $report['company_name']; ?></p>
+            </div>
+            <div class="col-md-4">
+                <p><strong>تاریخ گزارش:</strong> <?php echo $report['report_date']; ?></p>
             </div>
         </div>
         

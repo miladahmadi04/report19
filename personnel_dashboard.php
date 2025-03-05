@@ -3,14 +3,7 @@
 require_once 'database.php';
 require_once 'functions.php';
 require_once 'auth.php';
-// Debug code - comment or remove after fixing the issue
-echo '<div style="margin: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;">';
-echo '<h3>اطلاعات جلسه:</h3>';
-echo '<pre>';
-print_r($_SESSION);
-echo '</pre>';
-echo '</div>';
-// Check personnel access
+
 requirePersonnel();
 
 $personnelId = $_SESSION['user_id'];
@@ -331,7 +324,7 @@ include 'header.php';
     </div>
 </div>
 
-<?php if (!empty($_SESSION['companies']) && count($_SESSION['companies']) > 1): ?>
+<?php if (!empty($_SESSION['companies'])): ?>
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
