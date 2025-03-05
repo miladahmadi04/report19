@@ -124,7 +124,17 @@ if (!function_exists('personnelLogin')) {
             
             // اگر کاربر به هیچ شرکت فعالی دسترسی ندارد، ورود ناموفق است
             if (empty($companies)) {
-                return false;
+                // اگر جدول personnel_companies وجود ندارد یا استفاده نمی‌شود،
+                // فقط شرکت اصلی تعیین شده در جدول personnel را استفاده می‌کنیم
+                $stmt = $pdo->prepare("SELECT c.id as company_id, 1 as is_primary, c.name as company_name, c.is_active
+                                     FROM companies c
+                                     WHERE c.id = ? AND c.is_active = 1");
+                $stmt->execute([$personnel['company_id']]);
+                $companies = $stmt->fetchAll();
+                
+                if (empty($companies)) {
+                    return false;
+                }
             }
             
             // شرکت اصلی کاربر (اولین شرکت فعال یا شرکت پیش‌فرض)

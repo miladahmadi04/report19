@@ -1,51 +1,29 @@
 <?php
-// switch_company.php - تغییر شرکت جاری کاربر
+// switch_company.php - Change active company for personnel
 require_once 'database.php';
 require_once 'functions.php';
 require_once 'auth.php';
 
-// بررسی ورود کاربر
-requireLogin();
-
-// بررسی مدیر نبودن کاربر (مدیران به شرکت خاصی متصل نیستند)
-if (isAdmin()) {
-    redirect('admin_dashboard.php');
-}
-
-// دریافت شناسه شرکت از پارامتر URL
-$companyId = isset($_GET['company_id']) ? clean($_GET['company_id']) : null;
-
-if (!$companyId) {
+// Check if user is logged in and not admin
+if (!isLoggedIn() || isAdmin()) {
     redirect('index.php');
 }
 
-// بررسی دسترسی کاربر به شرکت
-$hasAccess = false;
-$newCompanyName = '';
-
-if (isset($_SESSION['companies'])) {
-    foreach ($_SESSION['companies'] as $company) {
-        if ($company['company_id'] == $companyId && $company['is_active']) {
-            $hasAccess = true;
-            $newCompanyName = $company['company_name'];
-            break;
-        }
+// Get company_id from URL
+if (isset($_GET['company_id']) && is_numeric($_GET['company_id'])) {
+    $companyId = clean($_GET['company_id']);
+    
+    // Try to switch company
+    if (switchCompany($companyId)) {
+        // Redirect to dashboard
+        redirect('personnel_dashboard.php');
+    } else {
+        // Redirect to dashboard with error
+        $_SESSION['error_message'] = 'شما به این شرکت دسترسی ندارید.';
+        redirect('personnel_dashboard.php');
     }
+} else {
+    // Redirect to dashboard
+    redirect('personnel_dashboard.php');
 }
-
-if (!$hasAccess) {
-    // نمایش پیام خطا
-    $_SESSION['message'] = showError('شما به این شرکت دسترسی ندارید.');
-    redirect('index.php');
-}
-
-// تغییر شرکت جاری کاربر
-$_SESSION['company_id'] = $companyId;
-$_SESSION['company_name'] = $newCompanyName;
-
-// نمایش پیام موفقیت
-$_SESSION['message'] = showSuccess("شرکت فعال به «{$newCompanyName}» تغییر یافت.");
-
-// بازگشت به صفحه قبلی یا صفحه اصلی
-$referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'index.php';
-redirect($referer);
+?>

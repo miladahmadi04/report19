@@ -3,11 +3,24 @@
 require_once 'database.php';
 require_once 'functions.php';
 require_once 'auth.php';
-
+// Debug code - comment or remove after fixing the issue
+echo '<div style="margin: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;">';
+echo '<h3>اطلاعات جلسه:</h3>';
+echo '<pre>';
+print_r($_SESSION);
+echo '</pre>';
+echo '</div>';
 // Check personnel access
 requirePersonnel();
 
 $personnelId = $_SESSION['user_id'];
+
+// نمایش پیام خطا در صورت وجود
+$message = '';
+if (isset($_SESSION['error_message'])) {
+    $message = showError($_SESSION['error_message']);
+    unset($_SESSION['error_message']);
+}
 
 // بررسی آیا کاربر فعلی دریافت کننده گزارش کوچ است
 function isCoachReportRecipient() {
@@ -47,14 +60,62 @@ function isCoachReportRecipient() {
 // تنظیم متغیر دسترسی به گزارش کوچ برای استفاده در header.php
 $_SESSION['can_view_coach_reports'] = hasPermission('view_coach_reports') || isCoachReportRecipient();
 
-// Get personnel information
-$stmt = $pdo->prepare("SELECT p.*, c.name as company_name, r.name as role_name 
-                      FROM personnel p 
-                      JOIN companies c ON p.company_id = c.id 
-                      JOIN roles r ON p.role_id = r.id 
-                      WHERE p.id = ?");
-$stmt->execute([$personnelId]);
-$personnel = $stmt->fetch();
+// Get personnel information with error handling
+try {
+    $stmt = $pdo->prepare("SELECT p.*, c.name as company_name, r.name as role_name 
+                        FROM personnel p 
+                        LEFT JOIN companies c ON p.company_id = c.id 
+                        LEFT JOIN roles r ON p.role_id = r.id 
+                        WHERE p.id = ?");
+    $stmt->execute([$personnelId]);
+    $personnel = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // اگر اطلاعات پرسنل یافت نشد، مقادیر پیش‌فرض تنظیم شود
+    if (!$personnel) {
+        // دریافت اطلاعات از جدول users
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $user = $stmt->fetch();
+        
+        $personnel = [
+            'id' => $_SESSION['user_id'],
+            'first_name' => isset($_SESSION['username']) ? $_SESSION['username'] : 'کاربر',
+            'last_name' => '',
+            'company_name' => isset($_SESSION['company_name']) ? $_SESSION['company_name'] : '',
+            'role_name' => 'کاربر سیستم',
+            'email' => $user ? $user['email'] : '',
+            'mobile' => '',
+        ];
+    }
+} catch (Exception $e) {
+    // در صورت هر گونه خطا، مقادیر پیش‌فرض تنظیم شود
+    $personnel = [
+        'id' => $_SESSION['user_id'],
+        'first_name' => isset($_SESSION['username']) ? $_SESSION['username'] : 'کاربر',
+        'last_name' => '',
+        'company_name' => isset($_SESSION['company_name']) ? $_SESSION['company_name'] : '',
+        'role_name' => 'کاربر سیستم',
+        'email' => '',
+        'mobile' => '',
+    ];
+}
+
+// مطمئن شویم که تمام فیلدهای مورد نیاز وجود دارند
+$personnel['first_name'] = isset($personnel['first_name']) ? $personnel['first_name'] : 'کاربر';
+$personnel['last_name'] = isset($personnel['last_name']) ? $personnel['last_name'] : '';
+$personnel['role_name'] = isset($personnel['role_name']) ? $personnel['role_name'] : 'کاربر';
+$personnel['email'] = isset($personnel['email']) ? $personnel['email'] : '';
+$personnel['mobile'] = isset($personnel['mobile']) ? $personnel['mobile'] : '';
+
+// مطمئن شویم که اطلاعات شرکت فعلی به‌روز است
+if (isset($_SESSION['company_id']) && isset($_SESSION['companies'])) {
+    foreach ($_SESSION['companies'] as $company) {
+        if ($company['company_id'] == $_SESSION['company_id']) {
+            $personnel['company_name'] = $company['company_name'];
+            break;
+        }
+    }
+}
 
 // If this is a CEO, show different dashboard
 if (isCEO()) {
@@ -181,17 +242,34 @@ include 'header.php';
 
 <h1 class="mb-4">داشبورد <?php echo isCEO() ? 'مدیر عامل' : 'پرسنل'; ?></h1>
 
+<?php echo $message; ?>
+
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">اطلاعات <?php echo isCEO() ? 'مدیر عامل' : 'پرسنلی'; ?></h5>
                 <ul class="list-group list-group-flush">
-                    <li class="list-group-item"><strong>نام و نام خانوادگی:</strong> <?php echo $personnel['first_name'] . ' ' . $personnel['last_name']; ?></li>
-                    <li class="list-group-item"><strong>شرکت:</strong> <?php echo $personnel['company_name']; ?></li>
-                    <li class="list-group-item"><strong>نقش:</strong> <?php echo $personnel['role_name']; ?></li>
-                    <li class="list-group-item"><strong>ایمیل:</strong> <?php echo $personnel['email']; ?></li>
-                    <li class="list-group-item"><strong>موبایل:</strong> <?php echo $personnel['mobile']; ?></li>
+                    <li class="list-group-item">
+                        <strong>نام و نام خانوادگی:</strong> 
+                        <?php echo $personnel['first_name'] . ' ' . $personnel['last_name']; ?>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>شرکت فعال:</strong> 
+                        <?php echo $personnel['company_name']; ?>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>نقش:</strong> 
+                        <?php echo $personnel['role_name']; ?>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>ایمیل:</strong> 
+                        <?php echo $personnel['email']; ?>
+                    </li>
+                    <li class="list-group-item">
+                        <strong>موبایل:</strong> 
+                        <?php echo $personnel['mobile']; ?>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -253,14 +331,47 @@ include 'header.php';
     </div>
 </div>
 
+<?php if (!empty($_SESSION['companies']) && count($_SESSION['companies']) > 1): ?>
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">انتخاب شرکت</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <?php foreach ($_SESSION['companies'] as $company): ?>
+                        <div class="col-md-3 mb-3">
+                            <div class="card <?php echo ($_SESSION['company_id'] == $company['company_id']) ? 'bg-primary text-white' : ''; ?>">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title"><?php echo $company['company_name']; ?></h5>
+                                    <?php if (isset($company['is_primary']) && $company['is_primary']): ?>
+                                        <span class="badge bg-warning text-dark">شرکت اصلی</span>
+                                    <?php endif; ?>
+                                    <?php if ($_SESSION['company_id'] != $company['company_id']): ?>
+                                        <div class="mt-2">
+                                            <a href="switch_company.php?company_id=<?php echo $company['company_id']; ?>" class="btn btn-sm btn-light">انتخاب</a>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="row">
-    <div class="col-md-<?php echo isCEO() || isset($coachReports) ? '6' : '12'; ?>">
+    <div class="col-md-<?php echo isset($coachReports) ? '6' : '12'; ?>">
         <div class="card mb-4">
             <div class="card-header bg-light">
                 <h5 class="mb-0">گزارش‌های روزانه اخیر</h5>
             </div>
             <div class="card-body">
-                <?php if (count($recentReports) > 0): ?>
+                <?php if (isset($recentReports) && count($recentReports) > 0): ?>
                     <div class="table-responsive">
                         <table class="table table-striped">
                             <thead>
@@ -303,3 +414,49 @@ include 'header.php';
             </div>
         </div>
     </div>
+
+    <?php if (isset($coachReports) && !empty($coachReports)): ?>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">گزارش‌های کوچ اخیر</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>تاریخ</th>
+                                <th>کوچ</th>
+                                <?php if (isset($coachReports[0]['session_title'])): ?>
+                                <th>عنوان</th>
+                                <?php endif; ?>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($coachReports as $report): ?>
+                                <tr>
+                                    <td><?php echo $report['report_date']; ?></td>
+                                    <td><?php echo $report['coach_name']; ?></td>
+                                    <?php if (isset($report['session_title'])): ?>
+                                    <td><?php echo $report['session_title']; ?></td>
+                                    <?php endif; ?>
+                                    <td>
+                                        <a href="coach_report_view.php?id=<?php echo $report['id']; ?>" class="btn btn-sm btn-info">مشاهده</a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-center">
+                    <a href="coach_report_list.php" class="btn btn-primary">مشاهده همه گزارش‌ها</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
+
+<?php include 'footer.php'; ?>
