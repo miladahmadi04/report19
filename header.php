@@ -195,7 +195,26 @@ require_once 'auth.php';
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-
+                <?php if (!isAdmin() && isset($_SESSION['companies']) && count($_SESSION['companies']) > 1): ?>
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" id="companyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="fas fa-building"></i> <?php echo $_SESSION['company_name']; ?>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="companyDropdown">
+        <?php foreach ($_SESSION['companies'] as $company): ?>
+            <li>
+                <a class="dropdown-item <?php echo ($company['company_id'] == $_SESSION['company_id']) ? 'active' : ''; ?>" 
+                   href="switch_company.php?company_id=<?php echo $company['company_id']; ?>">
+                    <?php echo $company['company_name']; ?>
+                    <?php if ($company['is_primary']): ?>
+                        <span class="badge bg-secondary">اصلی</span>
+                    <?php endif; ?>
+                </a>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</li>
+<?php endif; ?>
                     <li class="nav-item">
                         <a class="nav-link" href="#">
                             <i class="fas fa-user"></i> <?php echo $_SESSION['username']; ?>
